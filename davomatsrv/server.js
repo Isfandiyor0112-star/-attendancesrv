@@ -14,6 +14,19 @@ const users = [
 app.use(cors());
 app.use(express.json());
 
+let absents = []; // временно в памяти
+
+// Добавить отсутствующего
+app.post('/api/absent', (req, res) => {
+  absents.push(req.body);
+  res.json({ status: "ok" });
+});
+
+// Получить всех отсутствующих
+app.get('/api/absents', (req, res) => {
+  res.json(absents);
+});
+
 // Проверка логина и пароля
 app.post('/api/login', (req, res) => {
   const { login, password } = req.body;
@@ -29,4 +42,5 @@ app.post('/api/login', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
+
 });
