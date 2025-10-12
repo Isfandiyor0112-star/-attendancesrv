@@ -16,6 +16,12 @@ app.use(express.json());
 
 let absents = []; // временно в памяти
 
+// Очистить всех отсутствующих
+app.delete('/api/absents', (req, res) => {
+  absents = [];
+  res.json({ status: "ok" });
+});
+
 // Добавить отсутствующего
 app.post('/api/absent', (req, res) => {
   absents.push(req.body);
@@ -44,3 +50,4 @@ app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 
 });
+
