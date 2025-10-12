@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -14,22 +15,39 @@ const users = [
 app.use(cors());
 app.use(express.json());
 
-let absents = []; // временно в памяти
+// --- Работа с файлом для absents ---
+const ABSENTS_FILE = 'absents.json';
+
+function loadAbsents() {
+  if (fs.existsSync(ABSENTS_FILE)) {
+    return JSON.parse(fs.readFileSync(ABSENTS_FILE, 'utf8'));
+  }
+  return [];
+}
+
+function saveAbsents(data) {
+  fs.writeFileSync(ABSENTS_FILE, JSON.stringify(data, null, 2));
+}
+
+let absents = loadAbsents();
 
 // Очистить всех отсутствующих
 app.delete('/api/absents', (req, res) => {
   absents = [];
+  saveAbsents(absents);
   res.json({ status: "ok" });
 });
 
 // Добавить отсутствующего
 app.post('/api/absent', (req, res) => {
   absents.push(req.body);
+  saveAbsents(absents);
   res.json({ status: "ok" });
 });
 
 // Получить всех отсутствующих
 app.get('/api/absents', (req, res) => {
+  absents = loadAbsents(); // всегда актуальные данные
   res.json(absents);
 });
 
@@ -48,6 +66,4 @@ app.post('/api/login', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
-
 });
-
