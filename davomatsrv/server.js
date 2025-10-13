@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const app = express();
+const axios = require('axios');
 const PORT = process.env.PORT || 3000;
 
 // --- Telegram настройки ---
@@ -146,6 +147,7 @@ app.get('/api/ping-tg', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
 
 
 
