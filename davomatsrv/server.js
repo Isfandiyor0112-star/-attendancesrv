@@ -135,17 +135,18 @@ let lastPingTime = 0;
 
 app.get('/api/ping-tg', async (req, res) => {
   const now = Date.now();
+  new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Tashkent' })
     const msg = `[SERVER INFO] Пинг: ${new Date().toLocaleString()} — сервер не спит`;
     await sendToTelegram(msg);
     console.log('Крон пришёл');
-  }
-  res.status(200).send('pong + tg');
+    res.status(200).send('pong + tg');
 });
 
 
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
 
 
 
