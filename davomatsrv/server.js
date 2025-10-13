@@ -51,9 +51,9 @@ const users = [
   { login: "22maktab", password: "svetlana", name: "Ryabinina.S.Y.", className: "11B" },
   { login: "22maktab", password: "maftuna", name: "Abdullayeva.M.R.", className: "11V" },
   { login: "22maktab", password: "nilufar", name: "Aliyeva.N.M.", className: "11G" },
-  { login: "diamondkey", password: "shaxnoza", name: "Ruzimatova.Sh.R" },
-  { login: "goldenkey", password: "furkat", name: "Abduraxmonov.F.N" },
-  { login: "ironkey", password: "matlyuba", name: "Abdunamatova.M"},
+  { login: "shaxnoza", password: "diamondkey", name: "Ruzimatova.Sh.R" },
+  { login: "furkat", password: "goldenkey", name: "Abduraxmonov.F.N" },
+  { login: "matlyuba", password: "ironkey", name: "Abdunamatova.M"},
   { login: "admin", password: "admin", name: "Imamaliyev.I.B"}
    
 ];
@@ -114,4 +114,5 @@ app.post('/api/login', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
 
