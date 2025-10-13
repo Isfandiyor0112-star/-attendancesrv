@@ -4,6 +4,21 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// --- Telegram настройки ---
+const BOT_TOKEN = '8435086507:AAHo3--P4pW_pLkLxoVcCOc-Jn7GApWQGd0';
+const CHAT_ID = '6881699459'; // получи через getUpdates
+
+async function sendToTelegram(message) {
+  try {
+    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      chat_id: CHAT_ID,
+      text: message
+    });
+  } catch (error) {
+    console.error('Ошибка Telegram:', error.message);
+  }
+}
+
 // Простая "база" пользователей (логин и пароль)
 const users = [
   { login: "22maktab", password: "iroda", name: "Dadabayeva.I.D.", className: "1A" },
@@ -112,13 +127,26 @@ app.post('/api/login', (req, res) => {
 });
 
 app.get('/api/ping', (req, res) => {
-  res.status(200).send('pong');
+  res.status(200).send('TheServerDoesntSleep');
+});
+
+let lastPingTime = 0;
+
+app.get('/api/ping-tg', async (req, res) => {
+  const now = Date.now();
+  if (now - lastPingTime > 5 * 60 * 1000) { // 5 минут
+    const msg = `[DAVOMAT] Пинг: ${new Date().toLocaleString()} — сервер бодрствует`;
+    await sendToTelegram(msg);
+    lastPingTime = now;
+  }
+  res.status(200).send('pong + tg');
 });
 
 
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
 
 
 
