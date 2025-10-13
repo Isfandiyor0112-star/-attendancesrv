@@ -134,18 +134,27 @@ app.get('/api/ping', (req, res) => {
 let lastPingTime = 0;
 
 app.get('/api/ping-tg', async (req, res) => {
-  const now = new Date();
-  now.setHours(now.getHours() + 5);
+  try {
+    const now = new Date();
+    now.setHours(now.getHours() + 5);
     const msg = `[SERVER INFO] Пинг: ${now.toLocaleString()} — сервер не спит`;
     await sendToTelegram(msg);
     console.log('Крон пришёл');
     res.status(200).send('pong + tg');
+  } catch (error) {
+    const errMsg = `[ERROR] ${new Date().toLocaleString()} — ${error.message}`;
+    await sendToTelegram(errMsg); // отправляем ошибку в Telegram
+    console.error('Ошибка в /api/ping-tg:', error);
+    res.status(500).send('api/ping-tg упал');
+  }
 });
+
 
 
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
 
 
 
