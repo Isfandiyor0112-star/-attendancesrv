@@ -134,7 +134,7 @@ app.get('/api/ping', (req, res) => {
 let lastPingTime = 0;
 
 app.get('/api/ping-tg', async (req, res) => {
-  const now = Date.now();
+  const now = new Date();
   now.setHours(now.getHours() + 5);
     const msg = `[SERVER INFO] Пинг: ${new Date().toLocaleString()} — сервер не спит`;
     await sendToTelegram(msg);
@@ -146,6 +146,7 @@ app.get('/api/ping-tg', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
 
 
 
