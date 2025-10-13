@@ -136,7 +136,7 @@ let lastPingTime = 0;
 app.get('/api/ping-tg', async (req, res) => {
   const now = Date.now();
   if (now - lastPingTime > 5 * 60 * 1000) { // 5 минут
-    const msg = `[DAVOMAT] Пинг: ${new Date().toLocaleString()} — сервер бодрствует`;
+    const msg = `[SERVER INFO] Пинг: ${new Date().toLocaleString()} — сервер не спит`;
     await sendToTelegram(msg);
     lastPingTime = now;
   }
@@ -147,6 +147,7 @@ app.get('/api/ping-tg', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
 
 
 
