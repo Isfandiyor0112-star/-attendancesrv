@@ -111,8 +111,14 @@ app.post('/api/login', (req, res) => {
   }
 });
 
+app.get('/api/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
+
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
 
 
