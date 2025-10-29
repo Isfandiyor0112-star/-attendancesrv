@@ -152,7 +152,6 @@ app.get('/api/ping-tg', async (req, res) => {
     now.setHours(now.getHours() + 5);
     const msg = `[SERVER INFO] Пинг: ${now.toLocaleString('ru-RU', { hour12: false })} — сервер не спит`;
     await sendToTelegram(msg);
-    console.log('Крон работает');
     res.status(200).send('pong + tg');
   } catch (error) {
     const errMsg = `[ERROR] ${new Date().toLocaleString()} — ${error.message}`;
@@ -165,5 +164,6 @@ app.get('/api/ping-tg', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
    });
+
 
 
