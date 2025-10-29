@@ -67,10 +67,10 @@ const users = [
   { login: "22maktab", password: "svetlana", name: "Ryabinina.S.Y.", className: "11B" },
   { login: "22maktab", password: "maftuna", name: "Abdullayeva.M.R.", className: "11V" },
   { login: "22maktab", password: "nilufar", name: "Aliyeva.N.M.", className: "11G" },
-  { login: "shaxnoza", password: "netheritekey", name: "Ruzimatova.Sh.R" },
+  { login: "shaxnoza", password: "22_admin", name: "Ruzimatova.Sh.R" },
   { login: "furkat", password: "diamondkey", name: "Abduraxmonov.F.N" },
   { login: "matlyuba", password: "ironkey", name: "Abdunamatova.M"},
-  { login: "shahnoza", password: "goldenkey", name: "Bayjanova.Sh"}
+  { login: "admin", password: "goldenkey", name: "Bayjanova.Sh"}
    
 ];
 
@@ -154,6 +154,7 @@ app.get('/api/ping-tg', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
+
 
 
 
