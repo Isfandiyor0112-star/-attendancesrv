@@ -95,6 +95,7 @@ function loadAbsents() {
 function saveAbsents(data) {
   try {
     fs.writeFileSync(ABSENTS_FILE, JSON.stringify(data, null, 2));
+     console.log(`[SAVED] absents.json обновлён. Всего записей: ${data.length}`);
   } catch (err) {
     console.error("Ошибка при сохранении absents.json:", err);
   }
@@ -109,6 +110,7 @@ app.get('/api/absents', (req, res) => {
 });
 
 app.post('/api/absent', (req, res) => {
+  console.log('[RECEIVED] Новый absent:', req.body);
   absents.push(req.body);
   saveAbsents(absents);
 
@@ -163,4 +165,6 @@ app.get('/api/ping-tg', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
+   console.log(`[INIT] Загружено ${absents.length} отсутствующих из absents.json`);
 });
+
