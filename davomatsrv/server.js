@@ -87,15 +87,14 @@ function loadAbsents() {
     }
     return JSON.parse(fs.readFileSync(ABSENTS_FILE, 'utf8'));
   } catch (err) {
-    console.error("Ошибка при загрузке absents.json:", err);
-    return [];
+        return [];
   }
 }
 
 function saveAbsents(data) {
   try {
     fs.writeFileSync(ABSENTS_FILE, JSON.stringify(data, null, 2));
-     console.log(`[SAVED] absents.json обновлён. Всего записей: ${data.length}`);
+    
   } catch (err) {
     console.error("Ошибка при сохранении absents.json:", err);
   }
@@ -165,6 +164,6 @@ app.get('/api/ping-tg', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
-   console.log(`[INIT] Загружено ${absents.length} отсутствующих из absents.json`);
-});
+   });
+
 
