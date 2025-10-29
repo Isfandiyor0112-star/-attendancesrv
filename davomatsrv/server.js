@@ -1,13 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
-const app = express();
 const axios = require('axios');
+const app = express();
 const PORT = process.env.PORT || 3000;
 
 // --- Telegram настройки ---
 const BOT_TOKEN = '8435086507:AAHo3--P4pW_pLkLxoVcCOc-Jn7GApWQGd0';
-const CHAT_ID = '6881699459'; // получи через getUpdates
+const CHAT_ID = '6881699459';
 
 async function sendToTelegram(message) {
   try {
@@ -20,8 +20,8 @@ async function sendToTelegram(message) {
   }
 }
 
-// Простая "база" пользователей (логин и пароль)
-const users = [
+// --- Пользователи ---
+const users = [ 
   { login: "22maktab", password: "iroda", name: "Dadabayeva.I.D.", className: "1A" },
   { login: "22maktab", password: "anjilika", name: "Cherimitsina.A.K.", className: "1B" },
   { login: "22maktab", password: "dilfuza", name: "Ermakova.D.Y.", className: "1V" },
@@ -69,57 +69,71 @@ const users = [
   { login: "22maktab", password: "nilufar", name: "Aliyeva.N.M.", className: "11G" },
   { login: "shaxnoza", password: "22_admin", name: "Ruzimatova.Sh.R" },
   { login: "furkat", password: "diamondkey", name: "Abduraxmonov.F.N" },
-  { login: "matlyuba", password: "ironkey", name: "Abdunamatova.M"},
-  { login: "admin", password: "goldenkey", name: "Bayjanova.Sh"}
-   
+  { login: "matlyuba", password: "ironkey", name: "Abdunamatova.M" },
+  { login: "admin", password: "goldenkey", name: "Bayjanova.Sh" }
 ];
-
 
 app.use(cors());
 app.use(express.json());
 
-// --- Работа с файлом для absents ---
+// --- Работа с файлом absents.json ---
 const ABSENTS_FILE = 'absents.json';
 
 function loadAbsents() {
-  if (fs.existsSync(ABSENTS_FILE)) {
+  try {
+    if (!fs.existsSync(ABSENTS_FILE)) {
+      fs.writeFileSync(ABSENTS_FILE, '[]');
+      return [];
+    }
     return JSON.parse(fs.readFileSync(ABSENTS_FILE, 'utf8'));
+  } catch (err) {
+    console.error("Ошибка при загрузке absents.json:", err);
+    return [];
   }
-  return [];
 }
 
 function saveAbsents(data) {
-  fs.writeFileSync(ABSENTS_FILE, JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(ABSENTS_FILE, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error("Ошибка при сохранении absents.json:", err);
+  }
 }
 
 let absents = loadAbsents();
 
-// Очистить всех отсутствующих
+// --- API ---
+app.get('/api/absents', (req, res) => {
+  absents = loadAbsents();
+  res.json(absents);
+});
+
+app.post('/api/absent', (req, res) => {
+  absents.push(req.body);
+  saveAbsents(absents);
+
+  // Telegram-уведомление о пришедших
+  const { date, teacher, className, allstudents, count } = req.body;
+  const total = parseFloat(allstudents);
+  const sick = parseFloat(count);
+  const present = total - sick;
+  const percent = total ? ((present / total) * 100).toFixed(1) : '0';
+  const msg = `📊 ${teacher} отметил класс ${className} (${date}):\nПришли: ${present} из ${total} (${percent}%)`;
+  sendToTelegram(msg);
+
+  res.json({ status: "ok" });
+});
+
 app.delete('/api/absents', (req, res) => {
   absents = [];
   saveAbsents(absents);
   res.json({ status: "ok" });
 });
 
-// Добавить отсутствующего
-app.post('/api/absent', (req, res) => {
-  absents.push(req.body);
-  saveAbsents(absents);
-  res.json({ status: "ok" });
-});
-
-// Получить всех отсутствующих
-app.get('/api/absents', (req, res) => {
-  absents = loadAbsents(); // всегда актуальные данные
-  res.json(absents);
-});
-
-// Проверка логина и пароля
 app.post('/api/login', (req, res) => {
   const { login, password } = req.body;
   const user = users.find(u => u.login === login && u.password === password);
   if (user) {
-    // Не отправляем пароль обратно!
     const { password, ...userData } = user;
     res.json({ status: "ok", user: userData });
   } else {
@@ -131,44 +145,22 @@ app.get('/api/ping', (req, res) => {
   res.status(200).send('TheServerDoesntSleep');
 });
 
-let lastPingTime = 0;
-
 app.get('/api/ping-tg', async (req, res) => {
   try {
     const now = new Date();
     now.setHours(now.getHours() + 5);
-    const msg = `[SERVER INFO] Пинг: ${now.toLocaleString('ru-RU', {hour12: false})} — сервер не спит`;
+    const msg = `[SERVER INFO] Пинг: ${now.toLocaleString('ru-RU', { hour12: false })} — сервер не спит`;
     await sendToTelegram(msg);
     console.log('Крон работает');
     res.status(200).send('pong + tg');
   } catch (error) {
     const errMsg = `[ERROR] ${new Date().toLocaleString()} — ${error.message}`;
-    await sendToTelegram(errMsg); // отправляем ошибку в Telegram
+    await sendToTelegram(errMsg);
     console.error('Ошибка в /api/ping-tg:', error);
     res.status(500).send('api/ping-tg или api/ping упал');
   }
 });
 
-
-
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
