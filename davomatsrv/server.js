@@ -70,7 +70,7 @@ const users = [
   { login: "shaxnoza", password: "22_admin", name: "Ruzimatova.Sh.R" },
   { login: "furkat", password: "diamondkey", name: "Abduraxmonov.F.N" },
   { login: "matlyuba", password: "ironkey", name: "Abdunamatova.M"},
-  { login: "bayjanova", password: "goldenkey", name: "Bayjanova.Sh"}
+  { login: "admin", password: "goldenkey", name: "Bayjanova.Sh"}
    
 ];
 
@@ -165,6 +165,7 @@ app.get('/api/ping-tg', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
    });
+
 
 
 
