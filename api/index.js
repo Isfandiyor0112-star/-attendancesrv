@@ -117,5 +117,27 @@ app.delete('/api/absents', async (req, res) => {
   res.json({ status: "ok" });
 });
 
+// 1. Изменение имени (PUT)
+app.put('/api/absent/:id', async (req, res) => {
+  try {
+    const { studentName } = req.body;
+    await Absent.findByIdAndUpdate(req.params.id, { studentName });
+    res.json({ message: 'Обновлено' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Удаление записи (DELETE)
+app.delete('/api/absent/:id', async (req, res) => {
+  try {
+    await Absent.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Удалено' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = app;
+
 
