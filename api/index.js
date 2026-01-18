@@ -16,8 +16,13 @@ mongoose.connect(MONGO_URI)
   .catch(err => console.error('DB Error:', err));
 
 const Absent = mongoose.model('Absent', new mongoose.Schema({
-  teacher: String, className: String, date: String,
-  count: String, studentName: String, reason: String, allstudents: String
+  teacher: String, 
+  className: String, 
+  date: String,
+  count: String, 
+  studentName: String, 
+  reason: String, 
+  allstudents: String
 }));
 
 const users = [ 
@@ -72,12 +77,6 @@ const users = [
   { login: "admin", password: "goldenkey", name: "Bayjanova.Sh"}
 ];
 
-// Список паролей только админов
-const adminPasswords = ["22_admin", "diamondkey", "ironkey", "goldenkey"];
-
-// Проверка: есть ли пароль из заголовка в списке админских?
-const checkAdmin = (req) => adminPasswords.includes(req.headers['x-admin-key']);
-
 app.get('/api/absents', async (req, res) => {
   const data = await Absent.find().sort({ date: -1 });
   res.json(data);
@@ -104,26 +103,26 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// УДАЛЕНИЕ ВСЕЙ БАЗЫ (Только для админов)
+// Полная очистка
 app.delete('/api/absents', async (req, res) => {
-  if (checkAdmin(req)) {
-    await Absent.deleteMany({});
-    res.json({ status: "ok" });
-  } else {
-    res.status(403).json({ error: "Forbidden" });
-  }
+  await Absent.deleteMany({});
+  res.json({ status: "ok" });
 });
 
-// УДАЛЕНИЕ ОДНОЙ ЗАПИСИ (Только для админов)
+// Обновление (для исправления имен)
+app.put('/api/absent/:id', async (req, res) => {
+  try {
+    const updated = await Absent.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+    res.json({ status: "ok" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Удаление по ID
 app.delete('/api/absent/:id', async (req, res) => {
-  if (checkAdmin(req)) {
-    try {
-      await Absent.findByIdAndDelete(req.params.id);
-      res.json({ status: "ok" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
-  } else {
-    res.status(403).json({ error: "Forbidden" });
-  }
+  try {
+    await Absent.findByIdAndDelete(req.params.id);
+    res.json({ status: "ok" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = app;
