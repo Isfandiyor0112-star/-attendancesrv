@@ -50,6 +50,8 @@ const Absent = mongoose.model('Absent', new mongoose.Schema({
 }));
 
 // --- ТЕЛЕГРАМ БОТ ---
+
+// --- ТЕЛЕГРАМ БОТ ---
   
 app.post('/api/bot', async (req, res) => {
   try {
@@ -64,7 +66,6 @@ app.post('/api/bot', async (req, res) => {
       const chatId = callback_query.message.chat.id;
       const [action, userId] = callback_query.data.split(':');
 
-      // Кнопка: Управление конкретным юзером
       if (action === 'manage') {
         const user = await User.findById(userId);
         if (!user) return res.sendStatus(200);
@@ -83,27 +84,31 @@ app.post('/api/bot', async (req, res) => {
         });
       }
 
-      // Кнопки: Включение режима ожидания ввода
       if (['edit_name', 'edit_class', 'edit_pass'].includes(action)) {
-        userStates[chatId] = { action, userId }; // Запоминаем, что мы меняем
+        userStates[chatId] = { action, userId };
         const labels = { edit_name: "новое ИМЯ", edit_class: "новый КЛАСС", edit_pass: "новый ПАРОЛЬ" };
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           chat_id: chatId, text: `⌨️ Введите ${labels[action]} для этого пользователя:`
         });
       }
 
-      // Кнопка: Удаление
       if (action === 'confirm_del') {
         await User.findByIdAndDelete(userId);
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "✅ Пользователь удален." });
       }
 
-      // Кнопка: Добавить нового
       if (action === 'start_add') {
         userStates[chatId] = { action: 'adding_user' };
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           chat_id: chatId, text: "📝 Введите данные через пробел:\n`логин пароль имя класс`", parse_mode: "Markdown"
         });
+      }
+
+      if (action === 'back_to_list') {
+         // Просто вызываем список заново
+         const teachers = await User.find();
+         const keyboard = teachers.map((t, i) => ([{ text: `${i + 1}. ${t.name}`, callback_data: `manage:${t._id}` }]));
+         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "👨‍🏫 Список:", reply_markup: { inline_keyboard: keyboard } });
       }
 
       return res.sendStatus(200);
@@ -114,7 +119,7 @@ app.post('/api/bot', async (req, res) => {
     const chatId = message.chat.id;
     const text = message.text;
 
-    // ПРОВЕРКА СОСТОЯНИЙ (Если бот ждет от нас данные)
+    // ПРОВЕРКА СОСТОЯНИЙ
     if (userStates[chatId]) {
       const state = userStates[chatId];
       
@@ -137,8 +142,9 @@ app.post('/api/bot', async (req, res) => {
       }
 
       if (state.action === 'adding_user') {
-        const [login, password, name, className] = text.split(' ');
-        if (!className) return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "❌ Ошибка! Нужно 4 слова: логин пароль имя класс" });
+        const parts = text.split(' ');
+        if (parts.length < 4) return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "❌ Ошибка! Нужно 4 слова через пробел." });
+        const [login, password, name, className] = parts;
         await new User({ login, password, name, className }).save();
         delete userStates[chatId];
         return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: `✅ Учитель ${name} добавлен!` });
@@ -153,7 +159,6 @@ app.post('/api/bot', async (req, res) => {
         callback_data: `manage:${t._id}`
       }]));
       
-      // Добавляем в самый низ кнопку "Добавить"
       keyboard.push([{ text: "➕ Добавить нового учителя", callback_data: "start_add" }]);
 
       await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -169,37 +174,6 @@ app.post('/api/bot', async (req, res) => {
     console.error("🔴 ОШИБКА БОТА:", err.message);
     res.sendStatus(200);
   }
-});
-  // 2. ОБРАБОТКА ОБЫЧНЫХ СООБЩЕНИЙ
-  if (!message || !message.text) return res.sendStatus(200);
-  const text = message.text;
-
-  if (text === "O'qituvchilar ro'yxati") {
-    const teachers = await User.find();
-    const keyboard = teachers.map((t, i) => ([{
-      text: `${i + 1}. ${t.name} (${t.className})`,
-      callback_data: `manage:${t._id}`
-    }]));
-
-    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      chat_id: CHAT_ID,
-      text: "Выберите учителя для управления:",
-      reply_markup: { inline_keyboard: keyboard }
-    });
-  }
-
-  // Добавление нового пользователя (команда)
-  if (text.startsWith('ADD')) {
-    // Формат: ADD login password name className
-    const [_, login, password, name, className] = text.split(' ');
-    const newUser = new User({ login, password, name, className });
-    await newUser.save();
-    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      chat_id: CHAT_ID, text: `✅ Добавлен новый учитель: ${name}`
-    });
-  }
-
-  res.sendStatus(200);
 });
 
 
@@ -280,6 +254,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Экспортируем модуль для Vercel
 module.exports = app;
+
 
 
 
