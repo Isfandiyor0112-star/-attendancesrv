@@ -44,7 +44,7 @@ const users = [
   { login: "22maktab", password: "dilfuza22", name: "Normuratova.D.X.", className: "4V" },
   { login: "22maktab", password: "sevara", name: "Madaminova.S.Y.", className: "4G" },
   { login: "22maktab", password: "dilafruz2", name: "Sheranova.D.T.", className: "4D" },
-  { login: "22maktab", password: "gulnara", name: "Zokirxonova.G.B.", className: "5A" },
+  { login: "22maktab", password: "gulnara2", name: "Zokirxonova.G.B.", className: "5A" },
   { login: "22maktab", password: "anvar", name: "Umirzakov.A.A.", className: "5B" },
   { login: "22maktab", password: "xilola", name: "Ermatova.X.A.", className: "5V" },
   { login: "22maktab", password: "orzigul", name: "Mamatqulova.O.S.", className: "5G" },
@@ -126,4 +126,5 @@ app.delete('/api/absent/:id', async (req, res) => {
 });
 
 module.exports = app;
+
 
