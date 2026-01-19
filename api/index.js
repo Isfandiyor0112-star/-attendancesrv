@@ -5,16 +5,28 @@ const axios = require('axios');
 const mongoose = require('mongoose');
 
 const app = express();
-app.use(cors());
+
+// 1. Улучшенная настройка CORS для работы с Vercel
+app.use(cors({
+  origin: "*", // Позволяет запросы с любого фронтенда
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
 app.use(express.json());
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID; 
 const MONGO_URI = process.env.MONGO_URI;
 
-mongoose.connect(MONGO_URI)
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch(err => console.error('❌ DB Error:', err));
+// Подключение к БД с обработкой ошибок для Serverless
+if (MONGO_URI) {
+    mongoose.connect(MONGO_URI)
+      .then(() => console.log('✅ Connected to MongoDB'))
+      .catch(err => console.error('❌ DB Error:', err));
+} else {
+    console.error("❌ MONGO_URI is missing in Environment Variables!");
+}
 
 // --- МОДЕЛИ ---
 const User = mongoose.model('User', new mongoose.Schema({
@@ -35,7 +47,7 @@ const Absent = mongoose.model('Absent', new mongoose.Schema({
   allstudents: String
 }));
 
-// --- ТЕЛЕГРАМ БОТ (АДМИН-ПАНЕЛЬ) ---
+// --- ТЕЛЕГРАМ БОТ ---
 app.post('/api/bot', async (req, res) => {
   const { message } = req.body;
   if (!message || !message.text) return res.sendStatus(200);
@@ -69,7 +81,6 @@ app.post('/api/bot', async (req, res) => {
 
 // --- API ЭНДПОИНТЫ ---
 
-// 1. Авторизация
 app.post('/api/login', async (req, res) => {
   const { login, password } = req.body;
   const user = await User.findOne({ login, password });
@@ -77,11 +88,9 @@ app.post('/api/login', async (req, res) => {
   else res.json({ status: "error" });
 });
 
-// 2. Добавление отсутствующего
 app.post('/api/absent', async (req, res) => {
   try {
     const data = req.body;
-    // Фронтенд теперь сам присылает нужный текст (RU/UZ), сервер просто сохраняет
     const record = new Absent(data);
     await record.save();
 
@@ -97,50 +106,43 @@ app.post('/api/absent', async (req, res) => {
   }
 });
 
-// 3. Получение всех записей
 app.get('/api/absents', async (req, res) => {
   const data = await Absent.find().sort({ date: -1 });
   res.json(data);
 });
 
-// 4. РЕДАКТИРОВАНИЕ записи (исправление 404)
 app.put('/api/absent/:id', async (req, res) => {
   try {
     const updated = await Absent.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
     res.json({ status: "ok", data: updated });
-  } catch (err) { 
-    res.status(500).json({ error: err.message }); 
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 5. УДАЛЕНИЕ одной записи по ID (исправление 404)
 app.delete('/api/absent/:id', async (req, res) => {
   try {
     await Absent.findByIdAndDelete(req.params.id);
     res.json({ status: "ok" });
-  } catch (err) { 
-    res.status(500).json({ error: err.message }); 
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 6. ПОЛНАЯ ОЧИСТКА всей истории
 app.delete('/api/absents', async (req, res) => {
   try {
     await Absent.deleteMany({});
     res.json({ status: "ok" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 7. Список пользователей (для отчетов)
 app.get('/api/users', async (req, res) => {
   const users = await User.find();
   res.json(users);
 });
 
-// --- ЗАПУСК ---
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Сервер запущен: http://localhost:${PORT}`);
-});
+// --- ВАЖНО ДЛЯ VERCEL ---
+// Не запускаем app.listen в продакшене, Vercel сделает это сам
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = 3000;
+  app.listen(PORT, () => console.log(`🚀 Локальный сервер: http://localhost:${PORT}`));
+}
+
+// Экспортируем модуль для Vercel
+module.exports = app;
