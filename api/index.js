@@ -132,10 +132,20 @@ app.delete('/api/absents', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/users', async (req, res) => {
+ app.get('/api/users', async (req, res) => {
+  const { key } = req.query; // Вытаскиваем ключ из ссылки (?key=...)
+  const validKey = process.env.ADMIN_QUERY_KEY; // Вытаскиваем правильный ключ из настроек Vercel
+
+  // Сравниваем ключ из ссылки с ключом из настроек
+  if (!key || key !== validKey) {
+    return res.status(403).json({ error: "Access Denied" });
+  }
+
+  // Если всё ок — отдаем список
   const users = await User.find();
   res.json(users);
 });
+
 
 // --- ВАЖНО ДЛЯ VERCEL ---
 // Не запускаем app.listen в продакшене, Vercel сделает это сам
@@ -146,3 +156,4 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Экспортируем модуль для Vercel
 module.exports = app;
+
