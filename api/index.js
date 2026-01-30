@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const app = express();
 let userStates = {}; 
 
-// 1. Настройка CORS
+// 1. Настройка CORS (Полная)
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -63,7 +63,7 @@ app.post('/api/bot', async (req, res) => {
     const allowedUsers = process.env.CHAT_ID ? process.env.CHAT_ID.split(',') : [];
     if (!allowedUsers.includes(userId)) return res.sendStatus(200);
 
-    // --- CALLBACK КНОПКИ (Inline) ---
+    // --- 1. CALLBACK КНОПКИ (Inline под сообщениями) ---
     if (callback_query) {
       const [action, targetId] = callback_query.data.split(':');
 
@@ -112,21 +112,38 @@ app.post('/api/bot', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // --- ОБРАБОТКА ТЕКСТА ---
+    // --- 2. ГЛАВНЫЕ ТЕКСТОВЫЕ КОМАНДЫ (Приоритет) ---
     if (!message || !message.text) return res.sendStatus(200);
     const text = message.text;
 
-    // 1. Кнопка из нижнего меню (Reply Keyboard)
+    if (text === "/start" || text === "O'qituvchilar ro'yxati") {
+      delete userStates[chatId]; // СБРОС любого зависшего ввода
+      const teachers = await User.find();
+      const inlineKeyboard = teachers.map((t, i) => ([{ text: `${i+1}. ${t.name} (${t.className})`, callback_data: `manage:${t._id}` }]));
+      inlineKeyboard.push([{ text: "➕ Добавить учителя", callback_data: "start_add" }]);
+
+      return await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        chat_id: chatId, 
+        text: "👨‍🏫 **Управление системой:**", 
+        parse_mode: "Markdown", 
+        reply_markup: { 
+          inline_keyboard: inlineKeyboard,
+          keyboard: [[{ text: "O'qituvchilar ro'yxati" }], [{ text: "📢 Yangilik / Новости" }]],
+          resize_keyboard: true 
+        }
+      });
+    }
+
     if (text === "📢 Yangilik / Новости") {
       userStates[chatId] = { action: 'adding_news' };
       return await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         chat_id: chatId,
-        text: "📝 **Введите текст новости:**\nЕё увидят все учителя на сайте.",
+        text: "📝 **Введите текст новости:**\n(Чтобы отменить, просто нажмите кнопку списка)",
         parse_mode: "Markdown"
       });
     }
 
-    // 2. Обработка состояний (ввод данных)
+    // --- 3. ОБРАБОТКА ВВОДА (Если не нажата команда меню) ---
     if (userStates[chatId]) {
       const state = userStates[chatId];
 
@@ -147,27 +164,6 @@ app.post('/api/bot', async (req, res) => {
       }
       delete userStates[chatId];
       return await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "✅ Готово!" });
-    }
-
-    // 3. Команды старта и меню
-    if (text === "/start" || text === "O'qituvchilar ro'yxati") {
-      const teachers = await User.find();
-      const inlineKeyboard = teachers.map((t, i) => ([{ text: `${i+1}. ${t.name} (${t.className})`, callback_data: `manage:${t._id}` }]));
-      inlineKeyboard.push([{ text: "➕ Добавить учителя", callback_data: "start_add" }]);
-
-      await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        chat_id: chatId, 
-        text: "👨‍🏫 **Управление системой:**", 
-        parse_mode: "Markdown", 
-        reply_markup: { 
-          inline_keyboard: inlineKeyboard,
-          keyboard: [
-            [{ text: "O'qituvchilar ro'yxati" }],
-            [{ text: "📢 Yangilik / Новости" }]
-          ],
-          resize_keyboard: true 
-        }
-      });
     }
 
     res.sendStatus(200);
@@ -205,11 +201,6 @@ app.post('/api/absent', async (req, res) => {
 app.get('/api/absents', async (req, res) => {
   const data = await Absent.find().sort({ date: -1 });
   res.json(data);
-});
-
-app.delete('/api/absents', async (req, res) => {
-  try { await Absent.deleteMany({}); res.json({ status: "ok" }); } 
-  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/users', async (req, res) => {
