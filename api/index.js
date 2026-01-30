@@ -5,10 +5,12 @@ const axios = require('axios');
 const mongoose = require('mongoose');
 
 const app = express();
+
 let userStates = {}; 
 
+// 1. Улучшенная настройка CORS для работы с Vercel
 app.use(cors({
-  origin: "*",
+  origin: "*", // Позволяет запросы с любого фронтенда
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
@@ -19,44 +21,66 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID; 
 const MONGO_URI = process.env.MONGO_URI;
 
+// Подключение к БД с обработкой ошибок для Serverless
 if (MONGO_URI) {
-    mongoose.connect(MONGO_URI).catch(err => console.error('❌ DB Error:', err));
+    mongoose.connect(MONGO_URI)
+      .then(() => console.log('✅ Connected to MongoDB'))
+      .catch(err => console.error('❌ DB Error:', err));
+} else {
+    console.error("❌ MONGO_URI is missing in Environment Variables!");
 }
 
 // --- МОДЕЛИ ---
 const User = mongoose.model('User', new mongoose.Schema({
-  login: String, password: { type: String }, name: String, className: String, role: { type: String, default: "teacher" }
+  login: String, 
+  password: { type: String },
+  name: String, 
+  className: String, 
+  role: { type: String, default: "teacher" }
 }));
 
-const News = mongoose.model('News', new mongoose.Schema({
-  text: String, date: { type: Date, default: Date.now }
-}));
-
+// Сделай так:
 const Absent = mongoose.model('Absent', new mongoose.Schema({
-  teacher: String, className: String, date: String, count: String, studentName: String, reason: String, allstudents: String
-}), 'absents_fixed');
+  teacher: String, 
+  className: String, 
+  date: String,
+  count: String, 
+  studentName: String, 
+  reason: String, 
+  allstudents: String
+}), 'absents_fixed'); // <--- МЫ ДОБАВИЛИ ЭТО ИМЯ
 
 // --- ТЕЛЕГРАМ БОТ ---
+
+
+  
 app.post('/api/bot', async (req, res) => {
   try {
     const { message, callback_query } = req.body;
-    const fromId = message ? message.from.id : (callback_query ? callback_query.from.id : null);
-    if (!fromId) return res.sendStatus(200);
 
+    // 1. Определяем, кто нажал кнопку или прислал текст
+    const fromId = message ? message.from.id : callback_query.from.id;
     const userId = fromId.toString();
     const chatId = message ? message.chat.id : callback_query.message.chat.id;
 
+    // 2. ПРОВЕРКА ДОСТУПА (Разрезаем CHAT_ID по запятым)
     const allowedUsers = process.env.CHAT_ID ? process.env.CHAT_ID.split(',') : [];
-    if (!allowedUsers.includes(userId)) return res.sendStatus(200);
+    
+    if (!allowedUsers.includes(userId)) {
+      console.log(`[!] Доступ запрещен: ${userId}`);
+      return res.sendStatus(200);
+    }
 
-    // 1. ОБРАБОТКА CALLBACK КНОПОК
+    // --- ОБРАБОТКА КНОПОК (CALLBACK) ---
     if (callback_query) {
       const [action, targetId] = callback_query.data.split(':');
+
       if (action === 'manage') {
         const user = await User.findById(targetId);
+        if (!user) return res.sendStatus(200);
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           chat_id: chatId,
-          text: `👤 **${user.name}**\n📍 Класс: ${user.className}\n🔑 Логин: \`${user.login}\``,
+          text: `👤 **${user.name}**\n📍 Класс: ${user.className}\n🔑 Логин: \`${user.login}\`\n\nВыберите действие:`,
           parse_mode: "Markdown",
           reply_markup: {
             inline_keyboard: [
@@ -67,106 +91,95 @@ app.post('/api/bot', async (req, res) => {
           }
         });
       }
-      if (action === 'del_news_conf') {
-        await News.deleteOne({ _id: targetId });
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "🗑 Удалено." });
-      }
+
       if (['edit_name', 'edit_class', 'edit_pass'].includes(action)) {
         userStates[chatId] = { action, userId: targetId };
         const labels = { edit_name: "новое ИМЯ", edit_class: "новый КЛАСС", edit_pass: "новый ПАРОЛЬ" };
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: `⌨️ Введите ${labels[action]}:` });
+        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          chat_id: chatId, text: `⌨️ Введите ${labels[action]}:`
+        });
       }
+
       if (action === 'confirm_del') {
         await User.findByIdAndDelete(targetId);
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "✅ Удалено." });
       }
+
       if (action === 'start_add') {
         userStates[chatId] = { action: 'adding_user' };
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "📝 Введите: `логин пароль имя класс`" });
+        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          chat_id: chatId, text: "📝 Введите: `логин пароль имя класс` (через пробел)", parse_mode: "Markdown"
+        });
       }
+
       if (action === 'back_to_list') {
         const teachers = await User.find();
-        const kb = teachers.map((t, i) => ([{ text: `${i+1}. ${t.name}`, callback_data: `manage:${t._id}` }]));
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "👨‍🏫 Список:", reply_markup: { inline_keyboard: kb } });
+        const keyboard = teachers.map((t, i) => ([{ text: `${i+1}. ${t.name}`, callback_data: `manage:${t._id}` }]));
+        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "👨‍🏫 Список:", reply_markup: { inline_keyboard: keyboard } });
       }
       return res.sendStatus(200);
     }
 
-    // 2. ОБРАБОТКА ТЕКСТА
+    // --- ОБРАБОТКА ТЕКСТА ---
     if (!message || !message.text) return res.sendStatus(200);
     const text = message.text;
 
-    // --- ЖЕСТКАЯ ПРОВЕРКА КНОПОК МЕНЮ (МГНОВЕННЫЙ СБРОС) ---
-    if (text === "/start" || text === "O'qituvchilar ro'yxati") {
-      delete userStates[chatId]; // Сбрасываем всё
-      const teachers = await User.find();
-      const inlineKb = teachers.map((t, i) => ([{ text: `${i+1}. ${t.name} (${t.className})`, callback_data: `manage:${t._id}` }]));
-      inlineKb.push([{ text: "➕ Добавить учителя", callback_data: "start_add" }]);
-      await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        chat_id: chatId, text: "👨‍🏫 **Управление:**", parse_mode: "Markdown",
-        reply_markup: { 
-          inline_keyboard: inlineKb,
-          keyboard: [[{ text: "O'qituvchilar ro'yxati" }], [{ text: "📢 Добавить новость" }, { text: "🗑 Удалить новость" }]],
-          resize_keyboard: true 
-        }
-      });
-      return res.sendStatus(200);
-    }
-
-    if (text === "📢 Добавить новость") {
-      userStates[chatId] = { action: 'adding_news' };
-      return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "📝 Введите текст новости:" });
-    }
-
-    if (text === "🗑 Удалить новость") {
-      delete userStates[chatId];
-      const last = await News.findOne().sort({ date: -1 });
-      if (!last) return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "Новостей нет." });
-      return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        chat_id: chatId, text: `Удалить последнюю новость?\n\n"${last.text}"`,
-        reply_markup: { inline_keyboard: [[{ text: "✅ Удалить", callback_data: `del_news_conf:${last._id}` }]] }
-      });
-    }
-
-    // --- ОБРАБОТКА ВВОДА ДАННЫХ (ТОЛЬКО ЕСЛИ НЕ НАЖАТА КНОПКА МЕНЮ) ---
     if (userStates[chatId]) {
       const state = userStates[chatId];
-      if (state.action === 'adding_news') {
-        await new News({ text }).save();
-      } else if (state.action === 'adding_user') {
+      if (state.action === 'edit_name') await User.findByIdAndUpdate(state.userId, { name: text });
+      if (state.action === 'edit_class') await User.findByIdAndUpdate(state.userId, { className: text });
+      if (state.action === 'edit_pass') await User.findByIdAndUpdate(state.userId, { password: text });
+      if (state.action === 'adding_user') {
         const [l, p, n, c] = text.split(' ');
         if (c) await new User({ login: l, password: p, name: n, className: c }).save();
-      } else if (state.action === 'edit_name') await User.findByIdAndUpdate(state.userId, { name: text });
-      else if (state.action === 'edit_class') await User.findByIdAndUpdate(state.userId, { className: text });
-      else if (state.action === 'edit_pass') await User.findByIdAndUpdate(state.userId, { password: text });
-
+      }
       delete userStates[chatId];
-      return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "✅ Готово!" });
+      return await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "✅ Готово!" });
+    }
+
+    if (text === "/start" || text === "O'qituvchilar ro'yxati") {
+      const teachers = await User.find();
+      const keyboard = teachers.map((t, i) => ([{ text: `${i+1}. ${t.name} (${t.className})`, callback_data: `manage:${t._id}` }]));
+      keyboard.push([{ text: "➕ Добавить учителя", callback_data: "start_add" }]);
+      await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        chat_id: chatId, text: "👨‍🏫 **Управление базой:**", parse_mode: "Markdown", reply_markup: { inline_keyboard: keyboard }
+      });
     }
 
     res.sendStatus(200);
-  } catch (err) { res.sendStatus(200); }
+  } catch (err) {
+    console.error("🔴 Ошибка:", err.message);
+    res.sendStatus(200);
+  }
 });
 
-// --- API (ТВОИ ЭНДПОИНТЫ) ---
-app.get('/api/latest-news', async (req, res) => {
-  const latest = await News.findOne().sort({ date: -1 });
-  res.json(latest || { text: "" });
-});
+
+
+// --- API ЭНДПОИНТЫ ---
 
 app.post('/api/login', async (req, res) => {
   const { login, password } = req.body;
   const user = await User.findOne({ login, password });
-  res.json(user ? { status: "ok", user } : { status: "error" });
+  if (user) res.json({ status: "ok", user });
+  else res.json({ status: "error" });
 });
 
 app.post('/api/absent', async (req, res) => {
   try {
-    await new Absent(req.body).save();
-    const msg = `📊 **Hisobot**: ${req.body.teacher}\n❌ Yo'q: ${req.body.count}`;
-    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: CHAT_ID, text: msg }).catch(() => {});
+    const data = req.body;
+    const record = new Absent(data);
+    await record.save();
+
+    const msg = `📊 **Hisobot**: ${data.teacher} (${data.className})\n❌ Yo'q: ${data.count}\n📝 ${data.studentName}\n💬 Sabab: ${data.reason}`;
+    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { 
+        chat_id: CHAT_ID, 
+        text: msg 
+    }).catch(() => {});
+
     res.json({ status: "ok" });
-  } catch (err) { res.status(500).send(err.message); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/absents', async (req, res) => {
@@ -175,25 +188,53 @@ app.get('/api/absents', async (req, res) => {
 });
 
 app.put('/api/absent/:id', async (req, res) => {
-  await Absent.findByIdAndUpdate(req.params.id, { $set: req.body });
-  res.json({ status: "ok" });
+  try {
+    const updated = await Absent.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+    res.json({ status: "ok", data: updated });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/absent/:id', async (req, res) => {
-  await Absent.findByIdAndDelete(req.params.id);
-  res.json({ status: "ok" });
+  try {
+    await Absent.findByIdAndDelete(req.params.id);
+    res.json({ status: "ok" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/absents', async (req, res) => {
-  await Absent.deleteMany({});
-  res.json({ status: "ok" });
+  try {
+    await Absent.deleteMany({});
+    res.json({ status: "ok" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/users', async (req, res) => {
-  const { key } = req.query;
-  if (!key || key !== process.env.ADMIN_QUERY_KEY) return res.status(403).send("Denied");
+ app.get('/api/users', async (req, res) => {
+  const { key } = req.query; // Вытаскиваем ключ из ссылки (?key=...)
+  const validKey = process.env.ADMIN_QUERY_KEY; // Вытаскиваем правильный ключ из настроек Vercel
+
+  // Сравниваем ключ из ссылки с ключом из настроек
+  if (!key || key !== validKey) {
+    return res.status(403).json({ error: "Access Denied" });
+  }
+
+  // Если всё ок — отдаем список
   const users = await User.find();
   res.json(users);
 });
 
+
+// --- ВАЖНО ДЛЯ VERCEL ---
+// Не запускаем app.listen в продакшене, Vercel сделает это сам
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = 3000;
+  app.listen(PORT, () => console.log(`🚀 Локальный сервер: http://localhost:${PORT}`));
+}
+
+// Экспортируем модуль для Vercel
 module.exports = app;
+
+
+
+
+
+
