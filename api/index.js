@@ -58,14 +58,13 @@ app.post('/api/bot', async (req, res) => {
   try {
     const { message, callback_query } = req.body;
 
-    // 1. Определяем, кто нажал кнопку или прислал текст
+    // 1. Определяем пользователя
     const fromId = message ? message.from.id : callback_query.from.id;
     const userId = fromId.toString();
     const chatId = message ? message.chat.id : callback_query.message.chat.id;
 
-    // 2. ПРОВЕРКА ДОСТУПА (Разрезаем CHAT_ID по запятым)
+    // 2. Проверка доступа
     const allowedUsers = process.env.CHAT_ID ? process.env.CHAT_ID.split(',') : [];
-    
     if (!allowedUsers.includes(userId)) {
       console.log(`[!] Доступ запрещен: ${userId}`);
       return res.sendStatus(200);
@@ -74,6 +73,16 @@ app.post('/api/bot', async (req, res) => {
     // --- ОБРАБОТКА КНОПОК (CALLBACK) ---
     if (callback_query) {
       const [action, targetId] = callback_query.data.split(':');
+
+      // Кнопка создания новости
+      if (action === 'start_news') {
+        userStates[chatId] = { action: 'adding_news' };
+        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          chat_id: chatId, 
+          text: "📝 **Введите текст новости:**\nЭто сообщение увидят все учителя.",
+          parse_mode: "Markdown"
+        });
+      }
 
       if (action === 'manage') {
         const user = await User.findById(targetId);
@@ -126,6 +135,17 @@ app.post('/api/bot', async (req, res) => {
 
     if (userStates[chatId]) {
       const state = userStates[chatId];
+
+      // Сохранение новости в базу (коллекция News)
+      if (state.action === 'adding_news') {
+        await new News({ text: text }).save();
+        delete userStates[chatId];
+        return await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { 
+            chat_id: chatId, 
+            text: "✅ **Yangilik saqlandi! / Новость сохранена!**" 
+        });
+      }
+
       if (state.action === 'edit_name') await User.findByIdAndUpdate(state.userId, { name: text });
       if (state.action === 'edit_class') await User.findByIdAndUpdate(state.userId, { className: text });
       if (state.action === 'edit_pass') await User.findByIdAndUpdate(state.userId, { password: text });
@@ -140,9 +160,16 @@ app.post('/api/bot', async (req, res) => {
     if (text === "/start" || text === "O'qituvchilar ro'yxati") {
       const teachers = await User.find();
       const keyboard = teachers.map((t, i) => ([{ text: `${i+1}. ${t.name} (${t.className})`, callback_data: `manage:${t._id}` }]));
+      
+      // Добавляем кнопки управления
       keyboard.push([{ text: "➕ Добавить учителя", callback_data: "start_add" }]);
+      keyboard.push([{ text: "📢 Yangilik / Новости", callback_data: "start_news" }]);
+
       await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        chat_id: chatId, text: "👨‍🏫 **Управление базой:**", parse_mode: "Markdown", reply_markup: { inline_keyboard: keyboard }
+        chat_id: chatId, 
+        text: "👨‍🏫 **Управление системой:**", 
+        parse_mode: "Markdown", 
+        reply_markup: { inline_keyboard: keyboard }
       });
     }
 
@@ -152,9 +179,6 @@ app.post('/api/bot', async (req, res) => {
     res.sendStatus(200);
   }
 });
-
-
-
 // --- API ЭНДПОИНТЫ ---
 
 app.post('/api/login', async (req, res) => {
@@ -232,6 +256,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Экспортируем модуль для Vercel
 module.exports = app;
+
 
 
 
