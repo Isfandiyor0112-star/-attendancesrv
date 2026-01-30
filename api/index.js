@@ -39,6 +39,7 @@ const User = mongoose.model('User', new mongoose.Schema({
   role: { type: String, default: "teacher" }
 }));
 
+// Сделай так:
 const Absent = mongoose.model('Absent', new mongoose.Schema({
   teacher: String, 
   className: String, 
@@ -47,7 +48,7 @@ const Absent = mongoose.model('Absent', new mongoose.Schema({
   studentName: String, 
   reason: String, 
   allstudents: String
-}));
+}), 'absents_fixed'); // <--- МЫ ДОБАВИЛИ ЭТО ИМЯ
 
 // --- ТЕЛЕГРАМ БОТ ---
 
@@ -231,6 +232,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Экспортируем модуль для Vercel
 module.exports = app;
+
 
 
 
