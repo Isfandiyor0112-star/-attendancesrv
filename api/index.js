@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const app = express();
 let userStates = {}; 
 
-// 1. Настройка CORS (Полная)
+// 1. ПОЛНАЯ НАСТРОЙКА CORS (вернул на место)
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -16,9 +16,7 @@ app.use(cors({
 
 app.use(express.json());
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const CHAT_ID = process.env.CHAT_ID; 
-const MONGO_URI = process.env.MONGO_URI;
+const { BOT_TOKEN, CHAT_ID, MONGO_URI, ADMIN_QUERY_KEY } = process.env;
 
 // Подключение к БД
 if (MONGO_URI) {
@@ -56,14 +54,16 @@ app.post('/api/bot', async (req, res) => {
   try {
     const { message, callback_query } = req.body;
 
-    const fromId = message ? message.from.id : callback_query.from.id;
-    const userId = fromId.toString();
-    const chatId = message ? message.chat.id : callback_query.message.chat.id;
+    const fromId = message ? message.from.id : (callback_query ? callback_query.from.id : null);
+    if (!fromId) return res.sendStatus(200);
 
-    const allowedUsers = process.env.CHAT_ID ? process.env.CHAT_ID.split(',') : [];
+    const chatId = message ? message.chat.id : callback_query.message.chat.id;
+    const userId = fromId.toString();
+
+    const allowedUsers = CHAT_ID ? CHAT_ID.split(',') : [];
     if (!allowedUsers.includes(userId)) return res.sendStatus(200);
 
-    // --- 1. CALLBACK КНОПКИ (Inline под сообщениями) ---
+    // --- 1. ОБРАБОТКА CALLBACK КНОПОК ---
     if (callback_query) {
       const [action, targetId] = callback_query.data.split(':');
 
@@ -87,9 +87,7 @@ app.post('/api/bot', async (req, res) => {
       if (['edit_name', 'edit_class', 'edit_pass'].includes(action)) {
         userStates[chatId] = { action, userId: targetId };
         const labels = { edit_name: "новое ИМЯ", edit_class: "новый КЛАСС", edit_pass: "новый ПАРОЛЬ" };
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          chat_id: chatId, text: `⌨️ Введите ${labels[action]}:`
-        });
+        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: `⌨️ Введите ${labels[action]}:` });
       }
 
       if (action === 'confirm_del') {
@@ -99,27 +97,26 @@ app.post('/api/bot', async (req, res) => {
 
       if (action === 'start_add') {
         userStates[chatId] = { action: 'adding_user' };
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          chat_id: chatId, text: "📝 Введите: `логин пароль имя класс`", parse_mode: "Markdown"
-        });
+        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "📝 Введите: `логин пароль имя класс`", parse_mode: "Markdown" });
       }
 
       if (action === 'back_to_list') {
         const teachers = await User.find();
-        const keyboard = teachers.map((t, i) => ([{ text: `${i+1}. ${t.name}`, callback_data: `manage:${t._id}` }]));
+        const keyboard = teachers.map((t) => ([{ text: t.name, callback_data: `manage:${t._id}` }]));
         await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "👨‍🏫 Список:", reply_markup: { inline_keyboard: keyboard } });
       }
       return res.sendStatus(200);
     }
 
-    // --- 2. ГЛАВНЫЕ ТЕКСТОВЫЕ КОМАНДЫ (Приоритет) ---
+    // --- 2. ОБРАБОТКА ТЕКСТА (С приоритетом команд) ---
     if (!message || !message.text) return res.sendStatus(200);
     const text = message.text;
 
+    // ПРИНУДИТЕЛЬНЫЙ СБРОС (Если нажата кнопка меню)
     if (text === "/start" || text === "O'qituvchilar ro'yxati") {
-      delete userStates[chatId]; // СБРОС любого зависшего ввода
+      delete userStates[chatId];
       const teachers = await User.find();
-      const inlineKeyboard = teachers.map((t, i) => ([{ text: `${i+1}. ${t.name} (${t.className})`, callback_data: `manage:${t._id}` }]));
+      const inlineKeyboard = teachers.map((t) => ([{ text: `${t.name} (${t.className})`, callback_data: `manage:${t._id}` }]));
       inlineKeyboard.push([{ text: "➕ Добавить учителя", callback_data: "start_add" }]);
 
       return await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -136,28 +133,23 @@ app.post('/api/bot', async (req, res) => {
 
     if (text === "📢 Yangilik / Новости") {
       userStates[chatId] = { action: 'adding_news' };
-      return await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        chat_id: chatId,
-        text: "📝 **Введите текст новости:**\n(Чтобы отменить, просто нажмите кнопку списка)",
-        parse_mode: "Markdown"
-      });
+      return await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "📝 **Введите текст новости:**" });
     }
 
-    // --- 3. ОБРАБОТКА ВВОДА (Если не нажата команда меню) ---
+    // ОБРАБОТКА СОСТОЯНИЙ (Ввод текста)
     if (userStates[chatId]) {
       const state = userStates[chatId];
 
       if (state.action === 'adding_news') {
-        await new News({ text: text }).save();
+        await new News({ text }).save();
         delete userStates[chatId];
-        return await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { 
-            chat_id: chatId, text: "✅ **Новость сохранена!**" 
-        });
+        return await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "✅ Новость сохранена!" });
       }
 
       if (state.action === 'edit_name') await User.findByIdAndUpdate(state.userId, { name: text });
       if (state.action === 'edit_class') await User.findByIdAndUpdate(state.userId, { className: text });
       if (state.action === 'edit_pass') await User.findByIdAndUpdate(state.userId, { password: text });
+      
       if (state.action === 'adding_user') {
         const [l, p, n, c] = text.split(' ');
         if (c) await new User({ login: l, password: p, name: n, className: c }).save();
@@ -168,34 +160,30 @@ app.post('/api/bot', async (req, res) => {
 
     res.sendStatus(200);
   } catch (err) {
-    console.error("🔴 Ошибка:", err.message);
+    console.error("🔴 Ошибка бота:", err.message);
     res.sendStatus(200);
   }
 });
 
 // --- API ЭНДПОИНТЫ ДЛЯ САЙТА ---
 app.get('/api/latest-news', async (req, res) => {
-  try {
     const latest = await News.findOne().sort({ date: -1 });
     res.json(latest || { text: "" });
-  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/login', async (req, res) => {
   const { login, password } = req.body;
   const user = await User.findOne({ login, password });
-  if (user) res.json({ status: "ok", user });
-  else res.json({ status: "error" });
+  res.json(user ? { status: "ok", user } : { status: "error" });
 });
 
 app.post('/api/absent', async (req, res) => {
-  try {
-    const data = req.body;
-    await new Absent(data).save();
-    const msg = `📊 **Hisobot**: ${data.teacher}\n❌ Yo'q: ${data.count}\n📝 ${data.studentName}`;
-    await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: CHAT_ID, text: msg }).catch(()=>{});
-    res.json({ status: "ok" });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+    try {
+      await new Absent(req.body).save();
+      const msg = `📊 **Hisobot**: ${req.body.teacher}\n❌ Yo'q: ${req.body.count}\n📝 ${req.body.studentName}`;
+      await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: CHAT_ID, text: msg }).catch(()=>{});
+      res.json({ status: "ok" });
+    } catch (e) { res.status(500).send(e.message); }
 });
 
 app.get('/api/absents', async (req, res) => {
@@ -204,14 +192,9 @@ app.get('/api/absents', async (req, res) => {
 });
 
 app.get('/api/users', async (req, res) => {
-  const { key } = req.query;
-  if (key !== process.env.ADMIN_QUERY_KEY) return res.status(403).json({ error: "Access Denied" });
+  if (req.query.key !== ADMIN_QUERY_KEY) return res.status(403).json({ error: "Access Denied" });
   const users = await User.find();
   res.json(users);
 });
-
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(3000, () => console.log(`🚀 Server on http://localhost:3000`));
-}
 
 module.exports = app;
