@@ -39,6 +39,11 @@ const User = mongoose.model('User', new mongoose.Schema({
   role: { type: String, default: "teacher" }
 }));
 
+const News = mongoose.model('News', new mongoose.Schema({
+  text: String,
+  date: { type: Date, default: Date.now }
+}));
+
 // Сделай так:
 const Absent = mongoose.model('Absent', new mongoose.Schema({
   teacher: String, 
@@ -181,6 +186,20 @@ app.post('/api/bot', async (req, res) => {
 });
 // --- API ЭНДПОИНТЫ ---
 
+app.get('/api/latest-news', async (req, res) => {
+  try {
+    // Ищем последнюю созданную новость
+    const latest = await News.findOne().sort({ date: -1 });
+    if (!latest) {
+      return res.json({ text: "" }); // Если новостей нет, отдаем пустой текст
+    }
+    res.json(latest);
+  } catch (err) {
+    console.error("Ошибка API News:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/login', async (req, res) => {
   const { login, password } = req.body;
   const user = await User.findOne({ login, password });
@@ -256,6 +275,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Экспортируем модуль для Vercel
 module.exports = app;
+
 
 
 
