@@ -64,7 +64,7 @@ app.post('/api/bot', async (req, res) => {
     const allowedUsers = process.env.CHAT_ID ? process.env.CHAT_ID.split(',') : [];
     if (!allowedUsers.includes(userId)) return res.sendStatus(200);
 
-    // --- ОБРАБОТКА КНОПОК ПОД ТЕКСТОМ (CALLBACK) ---
+    // --- CALLBACK КНОПКИ (Управление учителями) ---
     if (callback_query) {
       const [action, targetId] = callback_query.data.split(':');
 
@@ -93,9 +93,7 @@ app.post('/api/bot', async (req, res) => {
       if (['edit_name', 'edit_class', 'edit_pass'].includes(action)) {
         userStates[chatId] = { action, userId: targetId };
         const labels = { edit_name: "новое ИМЯ", edit_class: "новый КЛАСС", edit_pass: "новый ПАРОЛЬ" };
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          chat_id: chatId, text: `⌨️ Введите ${labels[action]}:`
-        });
+        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: `⌨️ Введите ${labels[action]}:` });
       }
 
       if (action === 'confirm_del') {
@@ -105,9 +103,7 @@ app.post('/api/bot', async (req, res) => {
 
       if (action === 'start_add') {
         userStates[chatId] = { action: 'adding_user' };
-        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          chat_id: chatId, text: "📝 Введите: `логин пароль имя класс`", parse_mode: "Markdown"
-        });
+        await axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "📝 Введите: `логин пароль имя класс`", parse_mode: "Markdown" });
       }
 
       if (action === 'back_to_list') {
@@ -118,12 +114,13 @@ app.post('/api/bot', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // --- ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ ---
+    // --- ТЕКСТОВЫЕ КОМАНДЫ (С ПРИОРИТЕТОМ) ---
     if (!message || !message.text) return res.sendStatus(200);
     const text = message.text;
 
-    // Главные команды меню (ТВОЙ ВАРИАНТ)
+    // ПЕРВЫМ ДЕЛОМ: проверяем кнопки меню
     if (text === "/start" || text === "O'qituvchilar ro'yxati") {
+      delete userStates[chatId]; // СБРАСЫВАЕМ любые режимы ввода (новости/учителя)
       const teachers = await User.find();
       const inlineKb = teachers.map((t, i) => ([{ text: `${i+1}. ${t.name} (${t.className})`, callback_data: `manage:${t._id}` }]));
       inlineKb.push([{ text: "➕ Добавить учителя", callback_data: "start_add" }]);
@@ -146,28 +143,27 @@ app.post('/api/bot', async (req, res) => {
 
     if (text === "📢 Добавить новость") {
       userStates[chatId] = { action: 'adding_news' };
-      return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "Введите текст новости:" });
+      return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "📝 Введите текст новости:" });
     }
 
     if (text === "🗑 Удалить новость") {
+      delete userStates[chatId]; // Сброс
       const last = await News.findOne().sort({ date: -1 });
       if (!last) return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "Новостей нет." });
       return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
         chat_id: chatId,
         text: `Удалить эту новость?\n\n"${last.text}"`,
-        reply_markup: {
-          inline_keyboard: [[{ text: "✅ Да, удалить", callback_data: `del_news_conf:${last._id}` }]]
-        }
+        reply_markup: { inline_keyboard: [[{ text: "✅ Да, удалить", callback_data: `del_news_conf:${last._id}` }]] }
       });
     }
 
-    // ЛОГИКА ВВОДА (Здесь бот САМ выходит из режима после ввода)
+    // ВТОРЫМ ДЕЛОМ: если это не кнопка, обрабатываем ввод данных
     if (userStates[chatId]) {
       const state = userStates[chatId];
       
       if (state.action === 'adding_news') {
         await new News({ text: text }).save();
-        delete userStates[chatId]; // ВЫХОД ИЗ РЕЖИМА НОВОСТИ
+        delete userStates[chatId];
         return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "✅ Новость опубликована!" });
       }
 
@@ -179,16 +175,15 @@ app.post('/api/bot', async (req, res) => {
         if (c) await new User({ login: l, password: p, name: n, className: c }).save();
       }
       
-      delete userStates[chatId]; // ВЫХОД ИЗ ЛЮБОГО РЕЖИМА РЕДАКТИРОВАНИЯ
-      return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "✅ Данные обновлены!" });
+      delete userStates[chatId];
+      return axios.post(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, { chat_id: chatId, text: "✅ Готово!" });
     }
 
     res.sendStatus(200);
   } catch (err) { res.sendStatus(200); }
 });
 
-// --- ТВОИ API ЭНДПОИНТЫ (БЕЗ ИЗМЕНЕНИЙ) ---
-
+// --- ТВОИ API ЭНДПОИНТЫ ---
 app.get('/api/latest-news', async (req, res) => {
     const latest = await News.findOne().sort({ date: -1 });
     res.json(latest || { text: "" });
