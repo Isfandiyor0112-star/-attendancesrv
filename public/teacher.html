@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Панель учителя | School №22</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <script>
+    (function() {
+        try {
+            const user = JSON.parse(localStorage.getItem('teacher'));
+            if (!user) { window.location.replace('index.html'); }
+        } catch (e) { window.location.replace('index.html'); }
+    })();
+    </script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="teacher-page">
+
+<div class="container py-5">
+    <button id="newsBtn" class="btn btn-link p-0" onclick="showNews()" 
+            style="position: fixed; left: 15px; top: 15px; z-index: 1050; text-decoration: none; line-height: 1;">
+        <span style="font-size: 2.2rem;">🔔</span>
+        <span id="newsBadge" class="position-absolute badge rounded-pill bg-danger" 
+              style="display: none; top: 0; right: -5px; font-size: 0.65rem; border: 2px solid #1a1a1a; padding: 0.3em 0.5em;">
+            !
+        </span>
+    </button>
+
+    <div class="header-section text-center mb-5">
+        <h2 id="teacherName" class="main-title text-white" style="padding: 0 50px;"></h2>
+        <p class="text-white-50" data-i18n="management_desc">Управление посещаемостью класса</p>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card stat-card mb-4">
+                <div class="card-body p-4">
+                    <form id="attendanceForm" class="row g-4">
+                        <div class="col-12">
+                            <h6 class="text-primary fw-bold text-uppercase small" data-i18n="general_info">Общая информация</h6>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold" data-i18n="label_class">Класс</label>
+                            <input type="text" class="form-control custom-input" id="className" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold" data-i18n="label_date">Дата</label>
+                            <input type="date" class="form-control custom-input" id="date" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold" data-i18n="label_total">Всего по списку</label>
+                            <input type="number" class="form-control custom-input" id="allstudents" placeholder="0" required>
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <h6 class="text-primary fw-bold text-uppercase small" data-i18n="absence_data">Данные об отсутствии</h6>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold" data-i18n="label_sick">Кол-во болеющих</label>
+                            <input type="number" class="form-control custom-input highlighted" id="count" min="0" value="0" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold" data-i18n="label_names">Имена (через запятую)</label>
+                            <textarea class="form-control custom-input" id="studentName" rows="1" placeholder="Иван И., Анна М."></textarea>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label small fw-bold" data-i18n="label_reason">Причина</label>
+                            <input type="text" class="form-control custom-input" id="reason" placeholder="Напр: По болезни">
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <button type="submit" class="btn btn-primary-custom w-100 py-3 fw-bold" id="submitBtn">
+                                <span data-i18n="mark_btn">🚀 Отправить отчет в базу</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card stat-card shadow-lg">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0 text-white" data-i18n="absent_list">Список отсутствующих</h5>
+                        <span class="badge bg-primary rounded-pill" id="badgeCount" data-i18n="today">Сегодня</span>
+                    </div>
+                    <ul id="absentList" class="list-group list-group-flush"></ul>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <a href="https://t.me/imamaliev_11" target="_blank" class="text-decoration-none">
+                    <small class="text-white-50" data-i18n="support">Поддержка: @imamaliev_11</small>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="newsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content"> <div class="modal-header">
+                <h5 class="modal-title">📢 Yangiliklar / Новости</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="newsContent" style="white-space: pre-wrap;">
+                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ok" data-bs-dismiss="modal">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="language-picker">
+    <div class="glass-btn-group" id="langGroup" data-active="ru"> 
+        <div class="lang-slider"></div>
+        <button id="lang-ru" class="btn-lang active" onclick="setLang('ru')">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/f/f3/Flag_of_Russia.svg" alt="RU"> Рус
+        </button>
+        <button id="lang-uz" class="btn-lang" onclick="setLang('uz')">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/8/84/Flag_of_Uzbekistan.svg" alt="UZ"> Uzb
+        </button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="teacher.js"></script>
+<script>
+    document.getElementById('date').valueAsDate = new Date();
+    
+    // Запускаем проверку индикатора новостей при загрузке
+    if (typeof checkNewsIndicator === 'function') {
+        checkNewsIndicator();
+    }
+
+    document.getElementById('count').addEventListener('input', function(e) {
+        const lang = localStorage.getItem('lang') || 'ru';
+        const isZero = (this.value === "0" || this.value === "");
+        document.getElementById('studentName').disabled = isZero;
+        document.getElementById('reason').disabled = isZero;
+        if (isZero) {
+            document.getElementById('studentName').value = "";
+            document.getElementById('reason').value = "";
+            document.getElementById('studentName').placeholder = lang === 'ru' ? "Все на уроках" : "Hamma darsda";
+        }
+    });
+</script>
+</body>
+</html>
