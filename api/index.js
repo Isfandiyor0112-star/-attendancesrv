@@ -208,6 +208,69 @@ app.delete('/api/absents', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// 1. СОЗДАНИЕ ПОЛЬЗОВАТЕЛЯ / УЧИТЕЛЯ (POST /api/users)
+app.post('/api/users', async (req, res) => {
+    const key = req.query.key;
+    if (key !== "22_secret_admin_key") {
+        return res.status(403).json({ error: "Unauthorized: Invalid Admin Key" });
+    }
+    try {
+        const { name, login, password, className, role } = req.body;
+        const newUser = new User({
+            name,
+            login,
+            password,
+            className: className || "",
+            role: role || "teacher"
+        });
+        await newUser.save();
+        res.status(200).json({ success: true, message: "User created successfully", user: newUser });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. РЕДАКТИРОВАНИЕ ПОЛЬЗОВАТЕЛЯ / УЧИТЕЛЯ (PUT /api/users/:id)
+app.put('/api/users/:id', async (req, res) => {
+    const key = req.query.key;
+    if (key !== "22_secret_admin_key") {
+        return res.status(403).json({ error: "Unauthorized: Invalid Admin Key" });
+    }
+    try {
+        const { name, login, password, className } = req.body;
+        const updateData = {};
+        if (name) updateData.name = name;
+        if (login) updateData.login = login;
+        if (password) updateData.password = password;
+        if (className !== undefined) updateData.className = className;
+
+        const updatedUser = await User.findByIdAndUpdate(req.params.id, { $set: updateData }, { new: true });
+        if (!updatedUser) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        res.status(200).json({ success: true, message: "User updated successfully", user: updatedUser });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ / УЧИТЕЛЯ (DELETE /api/users/:id)
+app.delete('/api/users/:id', async (req, res) => {
+    const key = req.query.key;
+    if (key !== "22_secret_admin_key") {
+        return res.status(403).json({ error: "Unauthorized: Invalid Admin Key" });
+    }
+    try {
+        const deletedUser = await User.findByIdAndDelete(req.params.id);
+        if (!deletedUser) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        res.status(200).json({ success: true, message: "User deleted successfully" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
  app.get('/api/users', async (req, res) => {
   const { key } = req.query; // Вытаскиваем ключ из ссылки (?key=...)
   const validKey = process.env.ADMIN_QUERY_KEY; // Вытаскиваем правильный ключ из настроек Vercel
