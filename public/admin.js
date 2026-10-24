@@ -8,7 +8,7 @@ const reasonColors = ['#09ff00', '#ff0000', '#0d6efd', '#ffc107', '#6610f2', '#f
 
 const translations = {
     ru: {
-        admin_panel_title: "Админ-панель школы №2",
+        admin_panel_title: "Админ-панель школы №22",
         choose_date: "Выберите дату:",
         export_excel: "Excel отчёт",
         clear_history: "Очистить историю",
@@ -24,7 +24,7 @@ const translations = {
         err_no_data: "Недостаточно данных! Нужно {n} дн."
     },
     uz: {
-        admin_panel_title: "2-maktab admin paneli",
+        admin_panel_title: "22-maktab admin paneli",
         choose_date: "Sanani tanlang:",
         export_excel: "Excel yuklash",
         clear_history: "Tozalash",
